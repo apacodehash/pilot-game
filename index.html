@@ -28,6 +28,13 @@ var K={};
 document.addEventListener('keydown',function(e){
   K[e.keyCode]=true;initAudio();
   if([9,32,37,38,39,40].indexOf(e.keyCode)>=0)e.preventDefault();
+  // PvP room code input
+  if(st==='pvpjoin'){
+    if(e.keyCode===8){pvpInputCode=pvpInputCode.slice(0,-1);e.preventDefault();}
+    else if(e.keyCode===13&&pvpInputCode.length>=4){pvpMyPlane=plSel;pvpJoinRoom(pvpInputCode);}
+    else if(pvpInputCode.length<4&&e.key&&e.key.length===1&&/[A-Za-z0-9]/.test(e.key)){pvpInputCode+=e.key.toUpperCase();}
+    return;
+  }
   // Pause toggle (P=80 or Escape=27)
   if((e.keyCode===80||e.keyCode===27)&&(st==='play'||st==='pause')){
     st=st==='play'?'pause':'play';
@@ -38,6 +45,7 @@ document.addEventListener('keyup',function(e){K[e.keyCode]=false;});
 var mX=0,mY=0,mC=false;
 cv.addEventListener('mousemove',function(e){mX=e.offsetX;mY=e.offsetY;});
 cv.addEventListener('click',function(e){mX=e.offsetX;mY=e.offsetY;mC=true;initAudio();});
+cv.addEventListener('wheel',function(e){if(st==='planesel'&&window._planeScrollY!==undefined){e.preventDefault();window._planeScrollY=Math.max(0,window._planeScrollY+e.deltaY*0.5);}},{passive:false});
 
 // TOUCH CONTROLS
 var isMobile=/Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)||('ontouchstart' in window);
@@ -274,13 +282,23 @@ var T={
     ['Klassisk militär','Classic military','经典军用'],
     ['Snabb + offensiv','Fast + offensive','快速 + 进攻'],
     ['Tung eldkraft','Heavy firepower','重型火力'],
-    ['Energi + fart','Energy + speed','能量 + 速度']
+    ['Energi + fart','Energy + speed','能量 + 速度'],
+    ['Smyg + precision','Stealth + precision','隐身 + 精准'],
+    ['Tung + pålitlig','Heavy + reliable','重型 + 可靠'],
+    ['Energivapen','Energy weapons','能量武器'],
+    ['Allround energi','All-round energy','全能能量'],
+    ['Maximal eldkraft','Maximum firepower','最大火力']
   ],
   planeSpecial:[
     ['Missil + Bomb + EMP','Missile + Bomb + EMP','导弹 + 炸弹 + 电磁脉冲'],
     ['Missil + Boost + Spridning','Missile + Boost + Spread','导弹 + 加速 + 散射'],
     ['Bomb + Spridning + EMP','Bomb + Spread + EMP','炸弹 + 散射 + 电磁脉冲'],
-    ['Laser + Boost + Missil','Laser + Boost + Missile','激光 + 加速 + 导弹']
+    ['Laser + Boost + Missil','Laser + Boost + Missile','激光 + 加速 + 导弹'],
+    ['Missil + Laser + Boost','Missile + Laser + Boost','导弹 + 激光 + 加速'],
+    ['Missil + Bomb + Spridning','Missile + Bomb + Spread','导弹 + 炸弹 + 散射'],
+    ['Bomb + EMP + Laser','Bomb + EMP + Laser','炸弹 + 电磁脉冲 + 激光'],
+    ['EMP + Laser + Spridning + Boost','EMP + Laser + Spread + Boost','电磁脉冲 + 激光 + 散射 + 加速'],
+    ['Missil + Bomb + EMP','Missile + Bomb + EMP','导弹 + 炸弹 + 电磁脉冲']
   ],
   // HUD
   dead:['DÖD','DEAD','阵亡'],
@@ -296,6 +314,7 @@ var T={
   stageKillsPre:['Etapp: ','Stage: ','关卡：'],
   stageKillsMid:[' | Kills: ',' | Kills: ',' | 击杀：'],
   retry:['FÖRSÖK IGEN','TRY AGAIN','重新开始'],
+  mainMenu:['HUVUDMENY','MAIN MENU','主菜单'],
   // Pause
   paused:['PAUS','PAUSED','暂停'],
   resume:['Tryck P för att fortsätta','Press P to continue','按P继续'],
@@ -305,10 +324,405 @@ var T={
   bossDestroyed:['BOSS FÖRSTÖRD!','BOSS DESTROYED!','BOSS被消灭！'],
   // Touch
   fire:['ELD','FIRE','开火'],
+  // Floating action texts
+  missile:['MISSIL!','MISSILE!','导弹！'],
+  bomb:['BOMB!','BOMB!','炸弹！'],
+  emp:['EMP!','EMP!','电磁脉冲！'],
+  boost:['BOOST!','BOOST!','加速！'],
+  boom:['BOOM!','BOOM!','轰！'],
+  mega:['MEGA','MEGA','超级'],
+  hit:['TRÄFF!','HIT!','命中！'],
+  // Kill/combo
+  comboTxt:['COMBO','COMBO','连击'],
   // Language selector
-  langLabel:['SPRÅK:','LANGUAGE:','语言：']
+  langLabel:['SPRÅK:','LANGUAGE:','语言：'],
+  // PvP
+  pvp:['PvP ONLINE','PvP ONLINE','PvP 在线对战'],
+  pvpCreate:['SKAPA RUM','CREATE ROOM','创建房间'],
+  pvpJoin:['GÅ MED','JOIN ROOM','加入房间'],
+  pvpCode:['RUMKOD:','ROOM CODE:','房间号：'],
+  pvpWaiting:['VÄNTAR PÅ MOTSTÅNDARE...','WAITING FOR OPPONENT...','等待对手...'],
+  pvpConnected:['MOTSTÅNDARE ANSLUTEN!','OPPONENT CONNECTED!','对手已连接！'],
+  pvpReady:['REDO!','READY!','准备！'],
+  pvpNotReady:['TRYCK REDO','PRESS READY','点击准备'],
+  pvpFight:['KÄMPA!','FIGHT!','开战！'],
+  pvpYouWin:['DU VANN!','YOU WIN!','你赢了！'],
+  pvpYouLose:['DU FÖRLORADE!','YOU LOSE!','你输了！'],
+  pvpRematch:['ÅTERMATCH','REMATCH','再来一局'],
+  pvpLeave:['LÄMNA','LEAVE','离开'],
+  pvpOpponentLeft:['MOTSTÅNDAREN LÄMNADE','OPPONENT LEFT','对手离开了'],
+  pvpEnterCode:['ANGE KOD:','ENTER CODE:','输入房间号：'],
+  pvpConnecting:['ANSLUTER...','CONNECTING...','连接中...'],
+  pvpError:['FEL: ','ERROR: ','错误：'],
+  pvpVs:['MOT','VS','对战'],
+  pvpHP:['HP','HP','生命'],
+  pvpSelectPlane:['VÄLJ FLYGPLAN','SELECT PLANE','选择飞机'],
+  pvpWaitRematch:['VÄNTAR PÅ MOTSTÅNDARE...','WAITING FOR OPPONENT...','等待对手...']
 };
 function t(key){var v=T[key];if(!v)return key;if(Array.isArray(v))return v[lang]||v[0];return v;}
+
+// ============ PVP NETWORKING (PeerJS WebRTC - no server needed!) ============
+var pvpPeer=null; // PeerJS Peer instance
+var pvpConn=null; // PeerJS DataConnection
+var pvpState='none'; // none, connecting, lobby, planesel, ready, countdown, fight, result
+var pvpRoom=''; // room code (= peer ID suffix)
+var pvpIsHost=false; // true if this player created the room
+var pvpInputCode=''; // code being typed by guest
+var pvpOpponentPlane=0; // opponent's plane type
+var pvpOpponentReady=false;
+var pvpMyReady=false;
+var pvpCountdown=0;
+var pvpOpponent={x:0,y:0,vx:0,vy:0,roll:0,hp:100,mh:100,dead:false,boosting:false};
+var pvpBullets=[]; // opponent's bullets coming at us
+var pvpResult=''; // 'win','lose','disconnect'
+var pvpRematchMe=false;
+var pvpRematchOpp=false;
+var pvpError='';
+var pvpSendTimer=0;
+var pvpMyPlane=0;
+var pvpPeerLoaded=false;
+
+// Load PeerJS (try local file first, then CDN)
+function loadPeerJS(cb){
+  if(pvpPeerLoaded||typeof Peer!=='undefined'){pvpPeerLoaded=true;cb();return;}
+  var s=document.createElement('script');
+  // Try local peerjs.min.js first
+  s.src='peerjs.min.js';
+  s.onload=function(){pvpPeerLoaded=true;cb();};
+  s.onerror=function(){
+    // Fallback to CDN
+    var s2=document.createElement('script');
+    s2.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+    s2.onload=function(){pvpPeerLoaded=true;cb();};
+    s2.onerror=function(){pvpError=lang===0?'Kunde inte ladda PeerJS':lang===2?'无法加载PeerJS':'Could not load PeerJS';pvpState='none';};
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+}
+
+// Generate a short room code
+function genRoomCode(){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  var code='';for(var i=0;i<4;i++)code+=chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function pvpSend(msg){
+  if(pvpConn&&pvpConn.open){
+    try{pvpConn.send(msg);}catch(e){}
+  }
+}
+
+function pvpSetupConn(conn){
+  pvpConn=conn;
+  conn.on('data',function(msg){pvpHandleMsg(msg);});
+  conn.on('close',function(){
+    if(pvpState==='fight'){pvpResult='disconnect';pvpState='result';stopEngine();stopBGM();}
+    else if(pvpState!=='none'&&pvpState!=='result'){pvpError=t('pvpOpponentLeft');pvpState='none';}
+    pvpConn=null;
+  });
+  conn.on('error',function(err){
+    pvpError=err.message||'Connection error';
+  });
+}
+
+function pvpHandleMsg(msg){
+  if(!msg||!msg.type)return;
+  switch(msg.type){
+    case 'join':
+      pvpOpponentPlane=msg.planeType||0;pvpState='planesel';
+      pvpSend({type:'welcome',planeType:pvpMyPlane});
+      break;
+    case 'welcome':
+      pvpOpponentPlane=msg.planeType||0;pvpState='planesel';break;
+    case 'plane_select':
+      pvpOpponentPlane=msg.planeType;break;
+    case 'ready':
+      pvpOpponentReady=true;
+      // If both ready, host starts the game
+      if(pvpMyReady&&pvpOpponentReady&&pvpIsHost){
+        pvpSend({type:'start'});
+        pvpStartFight();
+      }
+      break;
+    case 'start':
+      pvpStartFight();break;
+    case 'state':
+      pvpOpponent.x=msg.x;pvpOpponent.y=H-msg.y;
+      pvpOpponent.vx=msg.vx;pvpOpponent.vy=-msg.vy;
+      pvpOpponent.roll=msg.roll;pvpOpponent.hp=msg.hp;pvpOpponent.mh=msg.mh;
+      pvpOpponent.dead=msg.dead;pvpOpponent.boosting=msg.boosting;
+      break;
+    case 'bullet':
+      pvpBullets.push({x:msg.x,y:H-msg.y,vx:msg.vx,vy:-msg.vy,dm:msg.dm||1,kind:msg.kind||'bullet',l:200});
+      break;
+    case 'died':
+      pvpResult='win';pvpState='result';stopEngine();stopBGM();break;
+    case 'rematch':
+      pvpRematchOpp=true;
+      if(pvpRematchMe&&pvpRematchOpp){
+        pvpSend({type:'restart'});pvpStartFight();
+      }
+      break;
+    case 'restart':
+      pvpStartFight();break;
+  }
+}
+
+function pvpCreateRoom(){
+  pvpState='connecting';pvpError='';
+  loadPeerJS(function(){
+    var code=genRoomCode();
+    var peerId='sky1942-'+code;
+    try{
+      pvpPeer=new Peer(peerId);
+    }catch(e){pvpError=e.message;pvpState='none';return;}
+    pvpPeer.on('open',function(id){
+      pvpRoom=code;pvpIsHost=true;pvpState='lobby';
+    });
+    pvpPeer.on('connection',function(conn){
+      pvpSetupConn(conn);
+    });
+    pvpPeer.on('error',function(err){
+      if(err.type==='unavailable-id'){
+        pvpPeer.destroy();pvpPeer=null;
+        pvpCreateRoom(); // retry with new code
+      } else if(pvpState==='connecting'||pvpState==='lobby'){
+        pvpError=lang===0?'Ingen internetanslutning':lang===2?'没有网络连接':'No internet connection';
+        pvpState='none';
+      }
+    });
+  });
+}
+
+function pvpJoinRoom(code){
+  pvpState='connecting';pvpError='';
+  loadPeerJS(function(){
+    var peerId='sky1942-join-'+code+'-'+Math.random().toString(36).substr(2,4);
+    try{
+      pvpPeer=new Peer(peerId);
+    }catch(e){pvpError=e.message;pvpState='none';return;}
+    pvpPeer.on('open',function(){
+      var targetId='sky1942-'+code.toUpperCase();
+      var conn=pvpPeer.connect(targetId,{reliable:true});
+      conn.on('open',function(){
+        pvpRoom=code.toUpperCase();pvpIsHost=false;
+        pvpSetupConn(conn);
+        pvpSend({type:'join',planeType:pvpMyPlane});
+      });
+      conn.on('error',function(err){
+        pvpError=err.message||'Could not connect to room';
+        pvpState='none';
+      });
+      // Timeout if connection doesn't open
+      setTimeout(function(){
+        if(pvpState==='connecting'){pvpError=lang===0?'Rummet hittades inte':lang===2?'房间未找到':'Room not found';pvpState='none';}
+      },8000);
+    });
+    pvpPeer.on('error',function(err){
+      pvpError=err.message||'Connection error';
+      if(pvpState==='connecting')pvpState='none';
+    });
+  });
+}
+
+function pvpStartFight(){
+  pvpState='countdown';pvpCountdown=180;
+  pvpResult='';pvpRematchMe=false;pvpRematchOpp=false;
+  pvpBullets=[];pvpSendTimer=0;
+  // Create player for PvP
+  pvpOpponent={x:W/2,y:90,vx:0,vy:0,roll:0,hp:100,mh:100,dead:false,boosting:false};
+  var pl=PLANES[pvpMyPlane],mhp=pl.hp;
+  P={x:W/2,y:H-90,vx:0,vy:0,hp:mhp,mh:mhp,cd:0,mc:0,bc:0,am:9999,bm:5,iv:0,kl:0,roll:0,dead:false,
+     laser:0,laserE:100,laserMax:100,sprd:0,emp:0,boost:0,boostE:100,boostMax:100,boosting:false,
+     pt:pvpMyPlane,spd:pl.spd,fr:pl.firerate,dmgM:pl.dmg};
+  P2=null;nPl=1;
+  PB=[];EB=[];MS=[];BM=[];PT=[];TX=[];DR=[];FB=[];EN=[];BOSS=null;
+  sc=0;cmb=0;cmbT=0;fls=0;shk=0;shkA=0;
+  initAudio();startEngine();
+}
+
+function pvpDisconnect(){
+  if(pvpConn){try{pvpConn.close();}catch(e){}pvpConn=null;}
+  if(pvpPeer){try{pvpPeer.destroy();}catch(e){}pvpPeer=null;}
+  pvpState='none';pvpRoom='';pvpInputCode='';pvpError='';
+  pvpMyReady=false;pvpOpponentReady=false;
+  pvpRematchMe=false;pvpRematchOpp=false;
+  stopEngine();stopBGM();
+}
+
+// ============ PVP UPDATE (called from main update) ============
+function pvpUpdate(){
+  if(pvpState==='countdown'){
+    pvpCountdown--;
+    if(pvpCountdown<=0){pvpState='fight';startBGM(1);}
+    return;
+  }
+  if(pvpState!=='fight')return;
+  if(P.dead)return;
+
+  // Player movement (same as normal)
+  var mx=(K[39]?1:0)-(K[37]?1:0)+(K[68]?1:0)-(K[65]?1:0);
+  var my=(K[40]?1:0)-(K[38]?1:0)+(K[83]?1:0)-(K[87]?1:0);
+  if(tJoy.active){mx+=tJoy.dx/50;my+=tJoy.dy/50;}
+  var ps=P.spd||1;
+  P.vx+=mx*0.7*ps;P.vy+=my*0.7*ps;
+  P.vx*=0.88;P.vy*=0.88;
+  P.x+=P.vx;P.y+=P.vy;
+  P.x=Math.max(25,Math.min(W-25,P.x));
+  P.y=Math.max(30,Math.min(H-30,P.y));
+  P.roll=P.vx;
+  if(P.iv>0)P.iv--;
+
+  // Shooting
+  if(P.cd>0)P.cd--;
+  var pfr=P.fr||1;
+  if((K[32]||tBtns.fire)&&P.cd<=0){
+    PB.push({x:P.x-8,y:P.y-25,vx:0,vy:-10,dm:P.dmgM||1});
+    PB.push({x:P.x+8,y:P.y-25,vx:0,vy:-10,dm:P.dmgM||1});
+    P.cd=Math.max(3,Math.round(7/pfr));sfxShoot();
+    pvpSend({type:'bullet',x:P.x-8,y:P.y-25,vx:0,vy:-10,dm:P.dmgM||1,kind:'bullet'});
+    pvpSend({type:'bullet',x:P.x+8,y:P.y-25,vx:0,vy:-10,dm:P.dmgM||1,kind:'bullet'});
+  }
+
+  // Special attacks
+  var pa=PLANES[P.pt].atk;
+  if(P.mc>0)P.mc--;
+  if(pa.missile&&(K[77]||K[190]||tBtns.missile)&&P.mc<=0&&P.am>0){
+    // Fire missiles toward opponent
+    MS.push({x:P.x-12,y:P.y-15,vx:-1,vy:-6,sp:8,tg:null,a:-Math.PI/2,l:140,pvp:true});
+    MS.push({x:P.x+12,y:P.y-15,vx:1,vy:-6,sp:8,tg:null,a:-Math.PI/2,l:140,pvp:true});
+    P.mc=28;P.am--;sfxMissile();
+    pvpSend({type:'bullet',x:P.x-12,y:P.y-15,vx:-1,vy:-8,dm:3,kind:'missile'});
+    pvpSend({type:'bullet',x:P.x+12,y:P.y-15,vx:1,vy:-8,dm:3,kind:'missile'});
+  }
+  if(P.bc>0)P.bc--;
+  if(pa.bomb&&(K[191]||tBtns.bomb)&&P.bc<=0&&P.bm>0){
+    FB.push({x:P.x,y:P.y,vy:-3,t:0,mt:50});
+    P.bc=40;P.bm--;sfxBomb();
+    pvpSend({type:'bullet',x:P.x,y:P.y,vx:0,vy:-3,dm:8,kind:'bomb'});
+  }
+  if(pa.spread&&(K[86]||tBtns.spread)&&P.sprd<=0){
+    for(var si=-3;si<=3;si++){
+      var sa=si*0.15;
+      PB.push({x:P.x,y:P.y-20,vx:Math.sin(sa)*6,vy:-10*Math.cos(sa),dm:(P.dmgM||1)*0.7});
+      pvpSend({type:'bullet',x:P.x,y:P.y-20,vx:Math.sin(sa)*6,vy:-10*Math.cos(sa),dm:(P.dmgM||1)*0.7,kind:'spread'});
+    }
+    P.sprd=45;sfxSpread();
+  }
+  if(P.sprd>0)P.sprd--;
+  if(pa.emp&&(K[78]||tBtns.emp)&&P.emp<=0){
+    P.emp=600;sfxEMP();
+    pvpSend({type:'bullet',x:P.x,y:P.y,vx:0,vy:0,dm:2,kind:'emp'});
+  }
+  if(P.emp>0)P.emp--;
+  // Boost
+  if(pa.boost){
+    if((K[16]||tBtns.boost)&&P.boostE>0){
+      P.boosting=true;P.boostE=Math.max(0,P.boostE-1.2);
+      P.spd=PLANES[P.pt].spd*1.8;
+    }else{P.boosting=false;P.spd=PLANES[P.pt].spd;if(P.boostE<P.boostMax)P.boostE+=0.3;}
+  }
+  // Laser
+  if(pa.laser&&(K[76]||tBtns.laser)&&P.laserE>0){
+    P.laser=1;P.laserE=Math.max(0,P.laserE-1.5);
+    pvpSend({type:'bullet',x:P.x,y:P.y-30,vx:0,vy:0,dm:0.4,kind:'laser'});
+  }else{P.laser=0;if(P.laserE<P.laserMax)P.laserE+=0.4;}
+
+  // Move our bullets
+  for(var i=PB.length-1;i>=0;i--){
+    PB[i].x+=PB[i].vx;PB[i].y+=PB[i].vy;
+    if(PB[i].y<-20||PB[i].y>H+20||PB[i].x<-20||PB[i].x>W+20)PB.splice(i,1);
+  }
+
+  // Move missiles
+  for(var i=MS.length-1;i>=0;i--){
+    var m=MS[i];
+    // In PvP, guide toward opponent
+    if(m.pvp&&!pvpOpponent.dead){
+      var tdx=pvpOpponent.x-m.x,tdy=pvpOpponent.y-m.y;
+      var ta=Math.atan2(tdy,tdx);
+      var da=ta-m.a;while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;
+      m.a+=da*0.08;
+    }
+    m.vx=Math.cos(m.a)*m.sp;m.vy=Math.sin(m.a)*m.sp;
+    m.x+=m.vx;m.y+=m.vy;m.l--;
+    if(m.l<=0||m.x<-30||m.x>W+30||m.y<-30||m.y>H+30){MS.splice(i,1);continue;}
+    // Hit opponent?
+    if(!pvpOpponent.dead){
+      var dx=m.x-pvpOpponent.x,dy=m.y-pvpOpponent.y;
+      if(dx*dx+dy*dy<900){
+        pvpSend({type:'bullet',x:m.x,y:m.y,vx:m.vx,vy:m.vy,dm:4,kind:'missile'});
+        BM.push({x:m.x,y:m.y,p:0,b:false});aP(m.x,m.y,8,255,150,0,3,20);sfxExplosion(false);
+        MS.splice(i,1);
+      }
+    }
+  }
+
+  // Falling bombs
+  for(var i=FB.length-1;i>=0;i--){
+    FB[i].y+=FB[i].vy;FB[i].t++;
+    if(FB[i].t>=FB[i].mt){
+      BM.push({x:FB[i].x,y:FB[i].y,p:0,b:true});
+      aP(FB[i].x,FB[i].y,18,255,80,0,4,30);sfxExplosion(true);shk=10;shkA=8;
+      // Check if bomb hits opponent
+      if(!pvpOpponent.dead){
+        var bdx=FB[i].x-pvpOpponent.x,bdy=FB[i].y-pvpOpponent.y;
+        if(bdx*bdx+bdy*bdy<3600)pvpSend({type:'bullet',x:FB[i].x,y:FB[i].y,vx:0,vy:0,dm:8,kind:'bomb'});
+      }
+      FB.splice(i,1);
+    }
+  }
+
+  // Check opponent's bullets hitting us
+  for(var i=pvpBullets.length-1;i>=0;i--){
+    var b=pvpBullets[i];
+    b.x+=b.vx;b.y+=b.vy;b.l--;
+    if(b.l<=0||b.x<-30||b.x>W+30||b.y<-30||b.y>H+30){pvpBullets.splice(i,1);continue;}
+    // Hit check (flip Y since opponent sees us mirrored)
+    var dx=b.x-P.x,dy=b.y-P.y;
+    if(!P.dead&&P.iv<=0&&dx*dx+dy*dy<625){
+      var dmg=Math.round(b.dm*10);
+      if(b.kind==='bomb')dmg=Math.round(b.dm*12);
+      if(b.kind==='missile')dmg=Math.round(b.dm*8);
+      if(b.kind==='emp')dmg=Math.round(b.dm*5);
+      P.hp-=dmg;fls=8;shk=5;shkA=4;sfxHit();
+      aP(P.x,P.y,5,255,100,100,2,15);
+      pvpBullets.splice(i,1);
+      if(P.hp<=0){
+        P.hp=0;P.dead=true;
+        BM.push({x:P.x,y:P.y,p:0,b:true});aP(P.x,P.y,20,255,100,0,4,35);sfxDeath();
+        pvpSend({type:'died'});
+        pvpResult='lose';pvpState='result';stopEngine();stopBGM();
+      }
+    }
+  }
+
+  // Laser hit check
+  if(P.laser&&!pvpOpponent.dead){
+    var ldx=Math.abs(P.x-pvpOpponent.x);
+    if(ldx<20&&pvpOpponent.y<P.y){
+      // Laser beam hits opponent
+      aP(pvpOpponent.x,pvpOpponent.y+10,2,0,200,255,1.5,8);
+    }
+  }
+
+  // Send our state periodically (every 2 frames)
+  pvpSendTimer++;
+  if(pvpSendTimer>=2){
+    pvpSendTimer=0;
+    pvpSend({type:'state',x:P.x,y:P.y,vx:P.vx,vy:P.vy,roll:P.roll,hp:P.hp,mh:P.mh,dead:P.dead,boosting:P.boosting});
+  }
+
+  // Update effects
+  for(var i=BM.length-1;i>=0;i--){BM[i].p+=0.04;if(BM[i].p>=1)BM.splice(i,1);}
+  for(var i=PT.length-1;i>=0;i--){PT[i].x+=PT[i].vx;PT[i].y+=PT[i].vy;PT[i].l--;if(PT[i].l<=0)PT.splice(i,1);}
+  for(var i=TX.length-1;i>=0;i--){TX[i].y-=0.8;TX[i].l--;if(TX[i].l<=0)TX.splice(i,1);}
+  if(shk>0){shk--;shkA*=0.9;}
+  if(cmbT>0)cmbT--;
+  if(fls>0)fls--;
+  scrollY+=1.5;
+}
 
 // PLAYERS
 var nPl=1; // 1 or 2 players
@@ -328,7 +742,22 @@ var PLANES=[
    atk:{missile:false,bomb:true,emp:true,laser:false,spread:true,boost:false}},
   {name:'SPITFIRE',col:['#E65100','#EF6C00','#F57C00','#FF9800'],
    hp:85,spd:1.1,firerate:1.5,dmg:0.8,
-   atk:{missile:true,bomb:false,emp:false,laser:true,spread:false,boost:true}}
+   atk:{missile:true,bomb:false,emp:false,laser:true,spread:false,boost:true}},
+  {name:'PHANTOM',col:['#1A237E','#283593','#3949AB','#5C6BC0'],
+   hp:70,spd:1.4,firerate:1.2,dmg:1.1,
+   atk:{missile:true,bomb:false,emp:false,laser:true,spread:false,boost:true}},
+  {name:'CORSAIR',col:['#004D40','#00695C','#00897B','#26A69A'],
+   hp:110,spd:0.9,firerate:1.1,dmg:1.3,
+   atk:{missile:true,bomb:true,emp:false,laser:false,spread:true,boost:false}},
+  {name:'VALKYRIE',col:['#880E4F','#AD1457','#C2185B','#E91E63'],
+   hp:90,spd:1.2,firerate:0.8,dmg:1.4,
+   atk:{missile:false,bomb:true,emp:true,laser:true,spread:false,boost:false}},
+  {name:'TEMPEST',col:['#E0A500','#F5B800','#FFC107','#FFD54F'],
+   hp:95,spd:1.0,firerate:1.3,dmg:1.0,
+   atk:{missile:false,bomb:false,emp:true,laser:true,spread:true,boost:true}},
+  {name:'WARHAWK',col:['#BF360C','#D84315','#E64A19','#FF5722'],
+   hp:130,spd:0.8,firerate:0.6,dmg:1.6,
+   atk:{missile:true,bomb:true,emp:true,laser:false,spread:false,boost:false}}
 ];
 function getDiffNames(){return T.diffNames[lang];}
 var DIFF_NAMES; // set by updateLangStrings
@@ -442,7 +871,7 @@ function drawPlaneGeneric(x,y,roll,pt,markCol){
     cx.beginPath();cx.arc(12,-8,5,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(24,-4,5,0,Math.PI*2);cx.fill();
     // Armor plates
     cx.fillStyle='rgba(255,255,255,0.08)';cx.fillRect(-6,-18,12,30);
-  } else {
+  } else if(pt===3){
     // SPITFIRE - elliptical wings, elegant
     cx.fillStyle=c[0];
     cx.beginPath();cx.ellipse(-16,0,18,4,0,0,Math.PI*2);cx.fill();
@@ -451,8 +880,57 @@ function drawPlaneGeneric(x,y,roll,pt,markCol){
     cx.fillStyle=c[2];cx.beginPath();cx.moveTo(-3,-24);cx.lineTo(0,-32);cx.lineTo(3,-24);cx.closePath();cx.fill();
     cx.fillStyle=c[0];cx.fillRect(-10,12,20,4);cx.fillRect(-8,14,4,6);cx.fillRect(4,14,4,6);
     cx.fillStyle='rgba(100,100,100,0.6)';cx.beginPath();cx.arc(0,-26,5,0,Math.PI*2);cx.fill();
-    // Flame exhaust hints
     cx.fillStyle='rgba(255,150,0,0.15)';cx.fillRect(-2,16,4,6);
+  } else if(pt===4){
+    // PHANTOM - stealth angular delta wing
+    cx.fillStyle=c[0];
+    cx.beginPath();cx.moveTo(0,-28);cx.lineTo(34,8);cx.lineTo(28,12);cx.lineTo(0,2);cx.lineTo(-28,12);cx.lineTo(-34,8);cx.closePath();cx.fill();
+    cx.fillStyle=c[1];cx.beginPath();cx.moveTo(-3,-28);cx.lineTo(3,-28);cx.lineTo(4,14);cx.lineTo(-4,14);cx.closePath();cx.fill();
+    cx.fillStyle=c[2];cx.beginPath();cx.moveTo(-2,-28);cx.lineTo(0,-36);cx.lineTo(2,-28);cx.closePath();cx.fill();
+    cx.fillStyle=c[0];cx.fillRect(-8,12,16,4);cx.fillRect(-6,14,4,5);cx.fillRect(2,14,4,5);
+    cx.fillStyle='rgba(100,100,100,0.6)';cx.beginPath();cx.arc(0,-16,4,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(100,180,255,0.15)';cx.fillRect(-3,16,6,5);
+  } else if(pt===5){
+    // CORSAIR - gull-wing fighter, bent wings
+    cx.fillStyle=c[0];
+    cx.beginPath();cx.moveTo(-30,2);cx.lineTo(-18,-4);cx.lineTo(-8,-2);cx.lineTo(8,-2);cx.lineTo(18,-4);cx.lineTo(30,2);cx.lineTo(30,6);cx.lineTo(-30,6);cx.closePath();cx.fill();
+    cx.beginPath();cx.arc(-30,4,3,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(30,4,3,0,Math.PI*2);cx.fill();
+    cx.fillStyle=c[1];cx.beginPath();cx.moveTo(-5,-22);cx.lineTo(5,-22);cx.lineTo(6,16);cx.lineTo(-6,16);cx.closePath();cx.fill();
+    cx.fillStyle=c[2];cx.beginPath();cx.moveTo(-4,-22);cx.lineTo(0,-30);cx.lineTo(4,-22);cx.closePath();cx.fill();
+    cx.fillStyle=c[0];cx.fillRect(-14,12,28,4);cx.fillRect(-10,14,5,6);cx.fillRect(5,14,5,6);
+    cx.fillStyle='rgba(100,100,100,0.6)';cx.beginPath();cx.arc(0,-24,5,0,Math.PI*2);cx.fill();
+    cx.fillStyle=c[3];cx.fillRect(-20,-1,4,4);cx.fillRect(16,-1,4,4);
+  } else if(pt===6){
+    // VALKYRIE - swept forward wings, futuristic
+    cx.fillStyle=c[0];
+    cx.beginPath();cx.moveTo(-32,-6);cx.lineTo(-10,0);cx.lineTo(-8,4);cx.lineTo(-28,6);cx.closePath();cx.fill();
+    cx.beginPath();cx.moveTo(32,-6);cx.lineTo(10,0);cx.lineTo(8,4);cx.lineTo(28,6);cx.closePath();cx.fill();
+    cx.fillStyle=c[1];cx.beginPath();cx.moveTo(-5,-26);cx.lineTo(5,-26);cx.lineTo(6,14);cx.lineTo(-6,14);cx.closePath();cx.fill();
+    cx.fillStyle=c[2];cx.beginPath();cx.moveTo(-3,-26);cx.lineTo(0,-34);cx.lineTo(3,-26);cx.closePath();cx.fill();
+    cx.fillStyle=c[0];cx.fillRect(-10,12,20,4);cx.fillRect(-8,14,4,6);cx.fillRect(4,14,4,6);
+    cx.fillStyle='rgba(100,100,100,0.6)';cx.beginPath();cx.arc(0,-20,5,0,Math.PI*2);cx.fill();
+    cx.fillStyle=c[3];cx.beginPath();cx.arc(-20,-2,3,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(20,-2,3,0,Math.PI*2);cx.fill();
+  } else if(pt===7){
+    // TEMPEST - twin-engine, canard wings
+    cx.fillStyle=c[0];cx.fillRect(-28,-2,56,5);
+    cx.beginPath();cx.arc(-28,0.5,2.5,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(28,0.5,2.5,0,Math.PI*2);cx.fill();
+    cx.fillStyle=c[0];cx.fillRect(-16,-14,32,4);
+    cx.fillStyle=c[1];cx.beginPath();cx.moveTo(-4,-22);cx.lineTo(4,-22);cx.lineTo(5,14);cx.lineTo(-5,14);cx.closePath();cx.fill();
+    cx.fillStyle=c[2];cx.beginPath();cx.moveTo(-3,-22);cx.lineTo(0,-30);cx.lineTo(3,-22);cx.closePath();cx.fill();
+    cx.fillStyle=c[0];cx.fillRect(-12,12,24,4);cx.fillRect(-10,14,4,6);cx.fillRect(6,14,4,6);
+    cx.fillStyle='rgba(100,100,100,0.6)';cx.beginPath();cx.arc(-16,-2,5,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(16,-2,5,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(255,200,0,0.2)';cx.fillRect(-2,16,4,5);
+  } else {
+    // WARHAWK - massive heavy assault, triple body
+    cx.fillStyle=c[0];cx.fillRect(-38,-3,76,7);
+    cx.beginPath();cx.arc(-38,0.5,3.5,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(38,0.5,3.5,0,Math.PI*2);cx.fill();
+    cx.fillStyle=c[1];cx.beginPath();cx.moveTo(-8,-20);cx.lineTo(8,-20);cx.lineTo(9,16);cx.lineTo(-9,16);cx.closePath();cx.fill();
+    cx.fillStyle=c[1];cx.fillRect(-22,-16,8,26);cx.fillRect(14,-16,8,26);
+    cx.fillStyle=c[2];cx.beginPath();cx.moveTo(-6,-20);cx.lineTo(0,-28);cx.lineTo(6,-20);cx.closePath();cx.fill();
+    cx.fillStyle=c[0];cx.fillRect(-22,12,44,5);cx.fillRect(-16,15,5,7);cx.fillRect(11,15,5,7);
+    cx.fillStyle='rgba(100,100,100,0.6)';
+    cx.beginPath();cx.arc(-18,-18,5,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(0,-22,5,0,Math.PI*2);cx.fill();cx.beginPath();cx.arc(18,-18,5,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(255,80,0,0.2)';cx.fillRect(-18,10,4,8);cx.fillRect(14,10,4,8);
   }
 
   // Cockpit + pilot (all planes)
@@ -959,7 +1437,7 @@ function killEnemy(i){
   aP(e.x,e.y,14,255,150,0,3.5,28);
   aP(e.x,e.y,6,255,30,0,2.5,32);
   shk=8;shkA=e.t==='t'?7:4;sfxExplosion(e.t==='t');
-  var txt=cmb>=5?'MEGA x'+cmb+'!':cmb>=3?'COMBO x'+cmb+'!':'+'+pts;
+  var txt=cmb>=5?t('mega')+' x'+cmb+'!':cmb>=3?t('comboTxt')+' x'+cmb+'!':'+'+pts;
   aT(e.x,e.y-20,txt,cmb>=3?'#FFD700':'#fff');
   var rr=Math.random();
   if(rr<0.18)DR.push({x:e.x,y:e.y,tp:'hp',vy:1,l:200});
@@ -994,6 +1472,10 @@ function doGameOver(){st='over';}
 // ============ UPDATE ============
 function update(){
   scrollY+=1.5; // Background scroll
+
+  // PvP mode update
+  if(pvpState==='countdown'||pvpState==='fight'){pvpUpdate();return;}
+  if(pvpState!=='none')return; // other pvp states don't need game update
 
   // PAUSE (P=80 or Escape=27)
   if(st==='pause'){return;}
@@ -1041,7 +1523,7 @@ function update(){
       for(var i=0;i<EN.length;i++){var dd=Math.abs(EN[i].x-P.x)+Math.abs(EN[i].y-P.y);if(dd<md){md=dd;tg=EN[i];}}
       MS.push({x:P.x-12,y:P.y-15,vx:-1,vy:-6,sp:8,tg:tg,a:-Math.PI/2,l:140});
       MS.push({x:P.x+12,y:P.y-15,vx:1,vy:-6,sp:8,tg:tg,a:-Math.PI/2,l:140});
-      P.mc=28;aT(P.x,P.y-35,'MISSIL!','#FF6D00');K[p1mKey]=false;sfxMissile();
+      P.mc=28;aT(P.x,P.y-35,t('missile'),'#FF6D00');K[p1mKey]=false;sfxMissile();
     }
     // BOMB (b=66 for 1P, /=191 in 2P)
     if(P.bc>0)P.bc--;
@@ -1049,7 +1531,7 @@ function update(){
     if(p1a.bomb&&(K[p1bKey]||tBtns.bomb)&&P.bc<=0&&P.bm>0){
       BOMBS.push({x:P.x,y:P.y-10,vx:0,vy:-6,sz:1,age:0,maxAge:45});
       P.bm--;P.bc=35;K[p1bKey]=false;
-      aT(P.x,P.y-30,'BOMB!','#FF1744');sfxBomb();
+      aT(P.x,P.y-30,t('bomb'),'#FF1744');sfxBomb();
     }
     // LASER (L=76 in 1P, ,=188 in 2P) - hold to fire, drains energy
     var p1lKey=nPl===2?188:76;
@@ -1074,14 +1556,14 @@ function update(){
     if(p1a.emp&&(K[p1eKey]||tBtns.emp)&&P.emp<=0){
       EMPS.push({x:P.x,y:P.y,r:0,maxR:140,dmg:35,age:0});
       P.emp=180;sfxEMP();K[p1eKey]=false;
-      aT(P.x,P.y-30,'EMP!','#00E5FF');
+      aT(P.x,P.y-30,t('emp'),'#00E5FF');
       shk=6;shkA=4;
     }
     // SPEED BOOST (Shift=16)
     if(P.boost>0)P.boost--;
     if(p1a.boost&&(K[16]||tBtns.boost)&&!P.boosting&&P.boostE>=50){
       P.boosting=true;P.boost=(P.pt===1)?100:60;P.boostE-=((P.pt===1)?35:50);sfxBoost();
-      aT(P.x,P.y-30,'BOOST!','#FFFF00');P.iv=60;
+      aT(P.x,P.y-30,t('boost'),'#FFFF00');P.iv=60;
     }
     if(P.boosting){
       P.vx*=1.12;P.vy*=1.12;
@@ -1122,14 +1604,14 @@ function update(){
       for(var i=0;i<EN.length;i++){var dd=Math.abs(EN[i].x-P2.x)+Math.abs(EN[i].y-P2.y);if(dd<md2){md2=dd;tg2=EN[i];}}
       MS.push({x:P2.x-12,y:P2.y-15,vx:-1,vy:-6,sp:8,tg:tg2,a:-Math.PI/2,l:140});
       MS.push({x:P2.x+12,y:P2.y-15,vx:1,vy:-6,sp:8,tg:tg2,a:-Math.PI/2,l:140});
-      P2.mc=28;aT(P2.x,P2.y-35,'MISSIL!','#FF6D00');K[81]=false;sfxMissile();
+      P2.mc=28;aT(P2.x,P2.y-35,t('missile'),'#FF6D00');K[81]=false;sfxMissile();
     }
     // BOMB (E=69)
     if(P2.bc>0)P2.bc--;
     if(p2a.bomb&&K[69]&&P2.bc<=0&&P2.bm>0){
       BOMBS.push({x:P2.x,y:P2.y-10,vx:0,vy:-6,sz:1,age:0,maxAge:45});
       P2.bm--;P2.bc=35;K[69]=false;
-      aT(P2.x,P2.y-30,'BOMB!','#FF1744');sfxBomb();
+      aT(P2.x,P2.y-30,t('bomb'),'#FF1744');sfxBomb();
     }
     // LASER (R=82) - hold to fire
     if(p2a.laser&&K[82]&&P2.laserE>2){
@@ -1151,14 +1633,14 @@ function update(){
     if(p2a.emp&&K[67]&&P2.emp<=0){
       EMPS.push({x:P2.x,y:P2.y,r:0,maxR:140,dmg:35,age:0});
       P2.emp=180;sfxEMP();K[67]=false;
-      aT(P2.x,P2.y-30,'EMP!','#00E5FF');
+      aT(P2.x,P2.y-30,t('emp'),'#00E5FF');
       shk=6;shkA=4;
     }
     // SPEED BOOST (Tab=9)
     if(P2.boost>0)P2.boost--;
     if(p2a.boost&&K[9]&&!P2.boosting&&P2.boostE>=50){
       P2.boosting=true;P2.boost=(P2.pt===1)?100:60;P2.boostE-=((P2.pt===1)?35:50);sfxBoost();
-      aT(P2.x,P2.y-30,'BOOST!','#FFFF00');P2.iv=60;
+      aT(P2.x,P2.y-30,t('boost'),'#FFFF00');P2.iv=60;
     }
     if(P2.boosting){
       P2.vx*=1.12;P2.vy*=1.12;
@@ -1241,7 +1723,7 @@ function update(){
       if(ddx*ddx+ddy*ddy<900){
         e.hp-=30;e.ht=6;aP(m.x,m.y,8,255,150,0,3.5,18);
         BM.push({x:m.x,y:m.y,p:0.2,b:false});sfxHit();
-        aT(e.x,e.y-18,'TRÄFF!','#FF6D00');
+        aT(e.x,e.y-18,t('hit'),'#FF6D00');
         if(e.hp<=0)killEnemy(j);mH=true;break;
       }
     }
@@ -1285,7 +1767,7 @@ function update(){
       aP(bx,by,12,255,255,200,4,20);
       aP(bx,by,10,100,100,100,3,50);
       shk=14;shkA=12;fls=8;
-      aT(bx,by-20,'BOOM!','#FFD700');
+      aT(bx,by-20,t('boom'),'#FFD700');
 
       // Damage ALL enemies within big radius
       var R2=BOMB_RADIUS*BOMB_RADIUS;
@@ -1550,7 +2032,7 @@ function update(){
       if(dx*dx+dy*dy<2000*bo2.sz){
         bo2.hp-=25;bo2.ht=6;aP(m.x,m.y,10,255,150,0,3.5,18);
         BM.push({x:m.x,y:m.y,p:0.2,b:false});
-        aT(m.x,m.y-18,'TRÄFF!','#FF6D00');MS.splice(i,1);
+        aT(m.x,m.y-18,t('hit'),'#FF6D00');MS.splice(i,1);
       }
     }
     // (Bomb damage to boss handled in unified bomb explosion logic above)
@@ -1819,8 +2301,8 @@ function drawOcean(){
       var il=ISLANDS[i];
       // Pagoda (multi-tier, larger)
       cx.fillStyle='#5D4037';
-      for(var t=0;t<4;t++){
-        var tw=20-t*4,th=10,ty=il.y-10-t*12;
+      for(var ti=0;ti<4;ti++){
+        var tw=20-ti*4,th=10,ty=il.y-10-ti*12;
         cx.fillRect(il.x-tw/2,ty,tw,th);
         cx.fillStyle='#C62828';cx.fillRect(il.x-tw/2-3,ty,tw+6,2);cx.fillStyle='#5D4037';
       }
@@ -2107,9 +2589,9 @@ function drawGameScene(){
 
   // Texts
   if(TX)for(var i=0;i<TX.length;i++){
-    var t=TX[i];cx.save();cx.globalAlpha=t.l/t.ml;
-    cx.fillStyle=t.c;cx.font='bold 14px Arial';cx.textAlign='center';
-    cx.fillText(t.t,t.x,t.y);cx.restore();
+    var ti=TX[i];cx.save();cx.globalAlpha=ti.l/ti.ml;
+    cx.fillStyle=ti.c;cx.font='bold 14px Arial';cx.textAlign='center';
+    cx.fillText(ti.t,ti.x,ti.y);cx.restore();
   }
 
   if(fls>0){cx.fillStyle='rgba(255,0,0,'+(fls*0.03)+')';cx.fillRect(0,0,W,H);}
@@ -2217,8 +2699,11 @@ function draw(){
 
   drawOcean();
 
+  // ====== PVP ACTIVE? Skip normal states ======
+  var pvpActive=pvpState==='lobby'||pvpState==='planesel'||pvpState==='countdown'||pvpState==='fight'||pvpState==='result'||pvpState==='connecting';
+
   // ====== MENU ======
-  if(st==='menu'){
+  if(st==='menu'&&!pvpActive){
     drawClouds();
     cx.fillStyle='rgba(0,0,0,0.65)';cx.fillRect(0,0,W,H);
     cx.fillStyle='#FFD700';cx.font='bold 42px Arial';cx.textAlign='center';cx.textBaseline='middle';
@@ -2264,10 +2749,11 @@ function draw(){
     }
 
     if(drawBtn(W/2,H/2+115,200,40,t('play1'))){nPl=1;st='planesel';}
-    if(drawBtn(W/2,H/2+162,200,40,t('play2'))){nPl=2;st='planesel';}
+    if(drawBtn(W/2,H/2+155,200,40,t('play2'))){nPl=2;st='planesel';}
+    if(drawBtn(W/2,H/2+195,200,40,t('pvp'))){st='pvpmenu';}
 
     // Language selector (below buttons)
-    var lgY=H/2+198;
+    var lgY=H/2+232;
     cx.fillStyle='#aaa';cx.font='bold 10px Arial';cx.textAlign='center';cx.textBaseline='middle';
     cx.fillText(t('langLabel'),W/2,lgY);
     var lgBw=52,lgTotalW=lgBw*3+8;
@@ -2282,6 +2768,313 @@ function draw(){
       cx.fillText(LANG_NAMES[li],lbx+lgBw/2,lgY+18);
       if(mC&&mX>=lbx&&mX<=lbx+lgBw&&mY>=lgY+8&&mY<=lgY+28){lang=li;updateLangStrings();}
     }
+
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP MENU ======
+  if(st==='pvpmenu'&&!pvpActive){
+    drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.75)';cx.fillRect(0,0,W,H);
+    cx.fillStyle='#FF6D00';cx.font='bold 32px Arial';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(t('pvp'),W/2,H/2-120);
+
+    if(pvpError){
+      cx.fillStyle='#F44336';cx.font='bold 13px Arial';
+      cx.fillText(t('pvpError')+pvpError,W/2,H/2-80);
+    }
+
+    if(drawBtn(W/2,H/2-30,220,44,t('pvpCreate'))){pvpMyPlane=plSel;pvpCreateRoom();}
+    if(drawBtn(W/2,H/2+30,220,44,t('pvpJoin'))){st='pvpjoin';pvpInputCode='';}
+    if(drawBtn(W/2,H/2+100,160,34,t('back'))){st='menu';pvpError='';}
+
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP JOIN (enter code) ======
+  if(st==='pvpjoin'&&!pvpActive){
+    drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.75)';cx.fillRect(0,0,W,H);
+    cx.fillStyle='#FFD700';cx.font='bold 22px Arial';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(t('pvpEnterCode'),W/2,H/2-80);
+
+    // Show input code
+    cx.fillStyle='rgba(255,255,255,0.1)';cx.fillRect(W/2-80,H/2-50,160,50);
+    cx.strokeStyle='#FFD700';cx.lineWidth=2;cx.strokeRect(W/2-80,H/2-50,160,50);
+    cx.fillStyle='#fff';cx.font='bold 32px monospace';
+    cx.fillText(pvpInputCode+'_',W/2,H/2-25);
+
+    cx.fillStyle='#aaa';cx.font='12px Arial';
+    cx.fillText(lang===0?'Skriv 4 bokstäver':lang===2?'输入4个字符':'Type 4 characters',W/2,H/2+15);
+
+    if(pvpInputCode.length>=4){
+      if(drawBtn(W/2,H/2+55,180,40,t('pvpJoin'))){pvpMyPlane=plSel;pvpJoinRoom(pvpInputCode);}
+    }
+    if(drawBtn(W/2,H/2+110,160,34,t('back'))){st='pvpmenu';pvpInputCode='';}
+
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP LOBBY (waiting for opponent) ======
+  if(pvpState==='connecting'){
+    drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.75)';cx.fillRect(0,0,W,H);
+    cx.fillStyle='#FFD700';cx.font='bold 18px Arial';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(t('pvpConnecting'),W/2,H/2);
+    mC=false;cx.restore();return;
+  }
+
+  if(pvpState==='lobby'){
+    drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.75)';cx.fillRect(0,0,W,H);
+    cx.fillStyle='#FFD700';cx.font='bold 22px Arial';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(t('pvpCode'),W/2,H/2-80);
+
+    // Big room code
+    cx.fillStyle='#fff';cx.font='bold 48px monospace';
+    cx.fillText(pvpRoom,W/2,H/2-30);
+
+    cx.fillStyle='#aaa';cx.font='14px Arial';
+    cx.fillText(t('pvpWaiting'),W/2,H/2+20);
+
+    // Animated dots
+    var dots='.'.repeat(1+Math.floor(Date.now()/500)%3);
+    cx.fillText(dots,W/2,H/2+42);
+
+    if(drawBtn(W/2,H/2+90,160,34,t('pvpLeave'))){pvpDisconnect();st='pvpmenu';}
+
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP PLANE SELECT ======
+  if(pvpState==='planesel'){
+    drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.8)';cx.fillRect(0,0,W,H);
+
+    cx.fillStyle='#FFD700';cx.font='bold 22px Arial';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(t('pvpSelectPlane'),W/2,25);
+
+    cx.fillStyle='#aaa';cx.font='12px Arial';
+    cx.fillText(t('pvpCode')+' '+pvpRoom,W/2,50);
+
+    // Show opponent's plane choice
+    cx.fillStyle='#F44336';cx.font='bold 11px Arial';
+    cx.fillText(t('pvpVs')+' '+PLANES[pvpOpponentPlane].name,W/2,68);
+
+    // Draw plane cards (same as normal selection but for PvP)
+    var cardW=Math.floor((W-30)/2),cardH=140;
+    var startY=85;
+    for(var pi=0;pi<4;pi++){
+      var col2=Math.floor(pi%2),row2=Math.floor(pi/2);
+      var cx0=10+col2*(cardW+10)+cardW/2;
+      var cy0=startY+row2*(cardH+8)+cardH/2;
+      var cLeft=cx0-cardW/2,cTop=cy0-cardH/2;
+      var selected=pi===pvpMyPlane;
+
+      cx.fillStyle=selected?'rgba(255,150,0,0.4)':'rgba(40,40,40,0.6)';
+      cx.fillRect(cLeft,cTop,cardW,cardH);
+      cx.strokeStyle=selected?'#FF6D00':'rgba(255,255,255,0.15)';
+      cx.lineWidth=selected?3:1;
+      cx.strokeRect(cLeft,cTop,cardW,cardH);
+      if(selected){cx.fillStyle='#FF6D00';cx.font='bold 9px Arial';cx.textAlign='center';cx.fillText('★ YOU',cx0,cTop+10);}
+
+      drawPlaneGeneric(cx0,cTop+(selected?34:24),0,pi,'#FF6D00');
+      cx.fillStyle=PLANES[pi].col[1];cx.font='bold 12px Arial';cx.textAlign='center';
+      cx.fillText(PLANES[pi].name,cx0,cTop+(selected?60:50));
+
+      // Stats
+      var barY2=cTop+(selected?70:58),barW2=cardW-24,barH2=5,barX2=cLeft+12;
+      var stats2=[{label:'HP',val:PLANES[pi].hp/150,col:'#4CAF50'},{label:'SPD',val:PLANES[pi].spd/1.3,col:'#2196F3'},{label:'ROF',val:PLANES[pi].firerate/1.5,col:'#FF9800'},{label:'DMG',val:PLANES[pi].dmg/1.5,col:'#F44336'}];
+      for(var si=0;si<stats2.length;si++){
+        var sy2=barY2+si*(barH2+3);
+        cx.fillStyle='#aaa';cx.font='bold 6px Arial';cx.textAlign='left';cx.fillText(stats2[si].label,barX2,sy2+barH2-1);
+        cx.fillStyle='rgba(255,255,255,0.1)';cx.fillRect(barX2+20,sy2,barW2-20,barH2);
+        cx.fillStyle=stats2[si].col;cx.fillRect(barX2+20,sy2,Math.min(stats2[si].val,1)*(barW2-20),barH2);
+      }
+
+      // Attacks
+      var atkY2=barY2+stats2.length*(barH2+3)+3;
+      var atkList2=[{key:'missile',label:'MIS',col:'#FF6D00'},{key:'bomb',label:'BMB',col:'#FF1744'},{key:'laser',label:'LAS',col:'#00E5FF'},{key:'spread',label:'SPR',col:'#FFA726'},{key:'emp',label:'EMP',col:'#7C4DFF'},{key:'boost',label:'BST',col:'#FFFF00'}];
+      var ac2=0;for(var ai=0;ai<atkList2.length;ai++)if(PLANES[pi].atk[atkList2[ai].key])ac2++;
+      var as2=Math.min(24,Math.floor((cardW-14)/ac2)),ax2=cx0-((ac2-1)*as2)/2,ai2=0;
+      for(var ai=0;ai<atkList2.length;ai++){
+        if(!PLANES[pi].atk[atkList2[ai].key])continue;
+        cx.fillStyle=atkList2[ai].col;cx.font='bold 7px Arial';cx.textAlign='center';
+        cx.fillText(atkList2[ai].label,ax2+ai2*as2,atkY2);ai2++;
+      }
+
+      if(mC&&mX>=cLeft&&mX<=cLeft+cardW&&mY>=cTop&&mY<=cTop+cardH){
+        pvpMyPlane=pi;pvpSend({type:'plane_select',planeType:pi});
+      }
+    }
+
+    // Ready button
+    var readyY=H-55;
+    if(!pvpMyReady){
+      if(drawBtn(W/2,readyY,200,40,t('pvpReady'))){
+        pvpMyReady=true;pvpSend({type:'ready'});
+        // If both ready and we're host, start!
+        if(pvpMyReady&&pvpOpponentReady&&pvpIsHost){pvpSend({type:'start'});pvpStartFight();}
+      }
+    } else {
+      cx.fillStyle='#4CAF50';cx.font='bold 16px Arial';cx.textAlign='center';
+      cx.fillText('✓ '+t('pvpReady'),W/2,readyY);
+    }
+    if(pvpOpponentReady){cx.fillStyle='#4CAF50';cx.font='11px Arial';cx.fillText(t('pvpConnected')+' ✓',W/2,readyY+22);}
+    else{cx.fillStyle='#aaa';cx.font='11px Arial';cx.fillText(t('pvpWaiting'),W/2,readyY+22);}
+
+    if(drawBtn(W/2,H-18,120,28,t('pvpLeave'))){pvpDisconnect();st='pvpmenu';}
+
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP COUNTDOWN ======
+  if(pvpState==='countdown'){
+    drawOcean();drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.5)';cx.fillRect(0,0,W,H);
+    var sec=Math.ceil(pvpCountdown/60);
+    cx.fillStyle='#FFD700';cx.font='bold 72px Arial';cx.textAlign='center';cx.textBaseline='middle';
+    cx.fillText(sec>0?String(sec):t('pvpFight'),W/2,H/2);
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP FIGHT ======
+  if(pvpState==='fight'){
+    // Draw background
+    drawClouds();
+
+    // Draw opponent plane (mirrored at top)
+    if(!pvpOpponent.dead){
+      if(pvpOpponent.boosting){cx.fillStyle='rgba(255,100,100,0.15)';cx.beginPath();cx.arc(pvpOpponent.x,pvpOpponent.y,30+Math.random()*8,0,Math.PI*2);cx.fill();}
+      drawPlaneGeneric(pvpOpponent.x,pvpOpponent.y,pvpOpponent.roll,pvpOpponentPlane,'#F44336');
+    }
+
+    // Draw our plane
+    if(P&&!P.dead&&(P.iv<=0||Math.floor(P.iv/3)%2===0)){
+      if(P.boosting){cx.fillStyle='rgba(255,200,0,0.15)';cx.beginPath();cx.arc(P.x,P.y,30+Math.random()*8,0,Math.PI*2);cx.fill();}
+      drawPlaneGeneric(P.x,P.y,P.roll,P.pt,'#4CAF50');
+    }
+
+    // Draw our bullets
+    for(var i=0;i<PB.length;i++)drawBullet(PB[i].x,PB[i].y,false);
+    // Draw missiles
+    for(var i=0;i<MS.length;i++)drawMissile(MS[i].x,MS[i].y,MS[i].a);
+    // Draw opponent bullets (red)
+    for(var i=0;i<pvpBullets.length;i++){
+      var ob=pvpBullets[i];
+      cx.fillStyle=ob.kind==='missile'?'#FF6D00':ob.kind==='bomb'?'#FF1744':'#F44336';
+      cx.beginPath();cx.arc(ob.x,ob.y,ob.kind==='bomb'?4:2.5,0,Math.PI*2);cx.fill();
+    }
+    // Draw falling bombs
+    for(var i=0;i<FB.length;i++)drawFallingBomb(FB[i]);
+    // Booms
+    for(var i=0;i<BM.length;i++)drawBoom(BM[i].x,BM[i].y,BM[i].p,BM[i].b);
+    // Particles
+    for(var i=0;i<PT.length;i++){var pp=PT[i],al2=pp.l/pp.ml;cx.fillStyle='rgba('+pp.r+','+pp.g+','+pp.b+','+(al2*0.7)+')';cx.beginPath();cx.arc(pp.x,pp.y,pp.sz||2,0,Math.PI*2);cx.fill();}
+    // Texts
+    for(var i=0;i<TX.length;i++){var ti2=TX[i];cx.save();cx.globalAlpha=ti2.l/ti2.ml;cx.fillStyle=ti2.c;cx.font='bold 14px Arial';cx.textAlign='center';cx.fillText(ti2.t,ti2.x,ti2.y);cx.restore();}
+    // Laser beam
+    if(P&&P.laser&&!P.dead){
+      cx.strokeStyle='rgba(0,229,255,0.7)';cx.lineWidth=4;
+      cx.beginPath();cx.moveTo(P.x,P.y-25);cx.lineTo(P.x,0);cx.stroke();
+      cx.strokeStyle='rgba(255,255,255,0.5)';cx.lineWidth=1.5;
+      cx.beginPath();cx.moveTo(P.x,P.y-25);cx.lineTo(P.x,0);cx.stroke();
+    }
+
+    if(fls>0){cx.fillStyle='rgba(255,0,0,'+(fls*0.03)+')';cx.fillRect(0,0,W,H);}
+
+    // PvP HUD
+    var hudH2=45;
+    cx.fillStyle='rgba(0,0,0,0.5)';cx.fillRect(4,4,W-8,hudH2);
+    cx.font='bold 11px Arial';cx.textAlign='left';cx.textBaseline='top';
+
+    // My HP
+    cx.fillStyle='#4CAF50';cx.fillText('YOU',10,10);
+    if(P){
+      var hr3=P.dead?0:P.hp/P.mh;
+      cx.fillStyle='#222';cx.fillRect(40,9,90,10);
+      cx.fillStyle=P.dead?'#555':hr3>0.5?'#4CAF50':hr3>0.25?'#FF9800':'#F44336';
+      cx.fillRect(40,9,90*hr3,10);
+      cx.fillStyle='#fff';cx.font='bold 9px Arial';cx.fillText(Math.max(0,P.hp)+'/'+P.mh,42,10);
+    }
+    // Opponent HP
+    cx.fillStyle='#F44336';cx.font='bold 11px Arial';cx.fillText(PLANES[pvpOpponentPlane].name,10,24);
+    var ohr=pvpOpponent.dead?0:pvpOpponent.hp/pvpOpponent.mh;
+    cx.fillStyle='#222';cx.fillRect(40,28,90,10);
+    cx.fillStyle=pvpOpponent.dead?'#555':ohr>0.5?'#F44336':ohr>0.25?'#FF9800':'#F44336';
+    cx.fillRect(40,28,90*ohr,10);
+    cx.fillStyle='#fff';cx.font='bold 9px Arial';cx.fillText(Math.max(0,pvpOpponent.hp)+'/'+pvpOpponent.mh,42,29);
+
+    // Room code top right
+    cx.fillStyle='#aaa';cx.font='9px Arial';cx.textAlign='right';
+    cx.fillText(pvpRoom,W-10,10);
+
+    // Attack cooldown indicators
+    if(P&&!P.dead){
+      var pa2=PLANES[P.pt].atk,icx=W-10,icy=25;
+      cx.font='bold 8px Arial';cx.textAlign='right';
+      if(pa2.missile){cx.fillStyle=P.mc<=0?'#FF6D00':'#555';cx.fillText('MIS:'+(P.mc<=0?'OK':P.mc),icx,icy);icy+=11;}
+      if(pa2.bomb){cx.fillStyle=P.bc<=0&&P.bm>0?'#FF1744':'#555';cx.fillText('BMB:'+P.bm,icx,icy);icy+=11;}
+      if(pa2.laser){cx.fillStyle='#00E5FF';cx.fillText('LAS:'+Math.round(P.laserE)+'%',icx,icy);icy+=11;}
+      if(pa2.spread){cx.fillStyle=P.sprd<=0?'#FFA726':'#555';cx.fillText('SPR:'+(P.sprd<=0?'OK':P.sprd),icx,icy);icy+=11;}
+      if(pa2.emp){cx.fillStyle=P.emp<=0?'#7C4DFF':'#555';cx.fillText('EMP:'+(P.emp<=0?'OK':Math.ceil(P.emp/60)+'s'),icx,icy);icy+=11;}
+      if(pa2.boost){cx.fillStyle='#FFFF00';cx.fillText('BST:'+Math.round(P.boostE)+'%',icx,icy);}
+    }
+
+    // Touch buttons for PvP
+    if(isMobile&&P&&!P.dead){
+      tBtnDefs=[];
+      var bx2=W-55,by2=H-60,br2=22,gap=50;
+      tBtnDefs.push({x:bx2,y:by2,r:br2,key:'fire',label:t('fire'),col:'#F44336'});
+      var pa3=PLANES[P.pt].atk,bi=1;
+      if(pa3.missile){tBtnDefs.push({x:bx2-bi*gap,y:by2,r:br2-2,key:'missile',label:'MIS',col:'#FF6D00'});bi++;}
+      if(pa3.bomb){tBtnDefs.push({x:bx2,y:by2-bi*gap+gap,r:br2-2,key:'bomb',label:'BMB',col:'#FF1744'});bi++;}
+      if(pa3.laser){tBtnDefs.push({x:bx2-gap,y:by2-gap,r:br2-2,key:'laser',label:'LAS',col:'#00E5FF'});}
+      if(pa3.spread){tBtnDefs.push({x:bx2,y:by2-gap*2+gap,r:br2-3,key:'spread',label:'SPR',col:'#FFA726'});}
+      if(pa3.emp){tBtnDefs.push({x:bx2-gap,y:by2-gap*2+gap,r:br2-3,key:'emp',label:'EMP',col:'#7C4DFF'});}
+      if(pa3.boost){tBtnDefs.push({x:bx2-gap*2,y:by2,r:br2-3,key:'boost',label:'BST',col:'#FFFF00'});}
+      for(var bi2=0;bi2<tBtnDefs.length;bi2++){
+        var bd2=tBtnDefs[bi2],pressed=!!tBtns[bd2.key];
+        cx.globalAlpha=pressed?0.9:0.4;cx.fillStyle=bd2.col;cx.beginPath();cx.arc(bd2.x,bd2.y,bd2.r,0,Math.PI*2);cx.fill();
+        cx.globalAlpha=1;cx.fillStyle='#fff';cx.font='bold 9px Arial';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(bd2.label,bd2.x,bd2.y);
+      }
+      // Joystick indicator
+      if(tJoy.active){
+        cx.globalAlpha=0.2;cx.fillStyle='#fff';cx.beginPath();cx.arc(tJoy.sx,tJoy.sy,40,0,Math.PI*2);cx.fill();
+        cx.globalAlpha=0.5;cx.fillStyle='#fff';cx.beginPath();cx.arc(tJoy.sx+tJoy.dx,tJoy.sy+tJoy.dy,15,0,Math.PI*2);cx.fill();
+        cx.globalAlpha=1;
+      }
+    }
+
+    mC=false;cx.restore();return;
+  }
+
+  // ====== PVP RESULT ======
+  if(pvpState==='result'){
+    drawClouds();
+    cx.fillStyle='rgba(0,0,0,0.7)';cx.fillRect(0,0,W,H);
+
+    cx.textAlign='center';cx.textBaseline='middle';
+    if(pvpResult==='win'){
+      cx.fillStyle='#FFD700';cx.font='bold 42px Arial';cx.fillText(t('pvpYouWin'),W/2,H/2-60);
+    } else if(pvpResult==='lose'){
+      cx.fillStyle='#F44336';cx.font='bold 42px Arial';cx.fillText(t('pvpYouLose'),W/2,H/2-60);
+    } else {
+      cx.fillStyle='#aaa';cx.font='bold 28px Arial';cx.fillText(t('pvpOpponentLeft'),W/2,H/2-60);
+    }
+
+    if(pvpResult!=='disconnect'){
+      if(!pvpRematchMe){
+        if(drawBtn(W/2,H/2+10,200,40,t('pvpRematch'))){
+          pvpRematchMe=true;pvpSend({type:'rematch'});
+          if(pvpRematchMe&&pvpRematchOpp){pvpSend({type:'restart'});pvpStartFight();}
+        }
+      } else {
+        cx.fillStyle='#aaa';cx.font='14px Arial';
+        cx.fillText(pvpRematchOpp?t('pvpConnected'):t('pvpWaitRematch'),W/2,H/2+10);
+      }
+    }
+    if(drawBtn(W/2,H/2+70,160,34,t('pvpLeave'))){pvpDisconnect();st='menu';}
 
     mC=false;cx.restore();return;
   }
@@ -2319,13 +3112,23 @@ function draw(){
       if(mC&&mX>=W/2+5&&mX<=W/2+tabW+5&&mY>=tabY&&mY<=tabY+tabH){selWho=2;}
     }
 
-    // Draw plane cards
-    var cardW=Math.floor((W-30)/2), cardH=155;
+    // Draw plane cards - scrollable 3-column grid for 9 planes
+    var cardCols=3;
+    var cardW=Math.floor((W-40)/cardCols), cardH=130;
     var startY=nPl===2?70:55;
-    for(var pi=0;pi<4;pi++){
-      var col=Math.floor(pi%2), row=Math.floor(pi/2);
+    var totalRows=Math.ceil(PLANES.length/cardCols);
+    var gridH=totalRows*(cardH+6);
+    var visH=H-startY-50;
+    if(!window._planeScrollY)window._planeScrollY=0;
+    if(gridH>visH){
+      if(keys[38]||keys[87])window._planeScrollY=Math.max(0,window._planeScrollY-4);
+      if(keys[40]||keys[83])window._planeScrollY=Math.min(gridH-visH,window._planeScrollY+4);
+    }
+    cx.save();cx.beginPath();cx.rect(0,startY,W,visH);cx.clip();
+    for(var pi=0;pi<PLANES.length;pi++){
+      var col=pi%cardCols, row=Math.floor(pi/cardCols);
       var cx0=10+col*(cardW+10)+cardW/2;
-      var cy0=startY+row*(cardH+8)+cardH/2;
+      var cy0=startY+row*(cardH+6)+cardH/2-window._planeScrollY;
       var cLeft=cx0-cardW/2, cTop=cy0-cardH/2;
 
       var selP1=pi===plSel, selP2=(nPl===2&&pi===p2Sel);
@@ -2362,12 +3165,12 @@ function draw(){
       cx.fillText(T.planeDesc[pi][lang],cx0,previewY+40);
 
       // Stat bars
-      var barY=previewY+50, barW=cardW-24, barH=6, barX=cLeft+12;
+      var barY=previewY+46, barW=cardW-20, barH=5, barX=cLeft+10;
       var stats=[
         {label:'HP',val:PLANES[pi].hp/150,col:'#4CAF50'},
-        {label:'SPD',val:PLANES[pi].spd/1.3,col:'#2196F3'},
+        {label:'SPD',val:PLANES[pi].spd/1.4,col:'#2196F3'},
         {label:'ROF',val:PLANES[pi].firerate/1.5,col:'#FF9800'},
-        {label:'DMG',val:PLANES[pi].dmg/1.5,col:'#F44336'}
+        {label:'DMG',val:PLANES[pi].dmg/1.6,col:'#F44336'}
       ];
       for(var si=0;si<stats.length;si++){
         var sy=barY+si*(barH+4);
@@ -2409,6 +3212,14 @@ function draw(){
         }
       }
     }
+    cx.restore(); // end clipping region
+
+    // Scroll indicator if needed
+    if(gridH>visH){
+      cx.fillStyle='rgba(255,255,255,0.4)';cx.font='10px Arial';cx.textAlign='center';
+      if(window._planeScrollY>0)cx.fillText('▲',W/2,startY+12);
+      if(window._planeScrollY<gridH-visH)cx.fillText('▼',W/2,startY+visH-5);
+    }
 
     // Difficulty reminder
     var diffY=H-55;
@@ -2448,7 +3259,8 @@ function draw(){
     cx.fillText(t('score')+Math.round(sc),W/2,H/2-12);
     var totalKl=(P?P.kl:0)+(P2?P2.kl:0);
     cx.fillText(t('stageKillsPre')+lv+t('stageKillsMid')+totalKl,W/2,H/2+6);
-    if(drawBtn(W/2,H/2+55,200,44,t('retry'))){startGame();}
+    if(drawBtn(W/2,H/2+45,200,38,t('retry'))){startGame();}
+    if(drawBtn(W/2,H/2+90,200,38,t('mainMenu'))){st='menu';window._planeScrollY=0;}
     mC=false;cx.restore();return;
   }
 
@@ -2457,9 +3269,10 @@ function draw(){
     drawGameScene();
     cx.fillStyle='rgba(0,0,0,0.55)';cx.fillRect(0,0,W,H);
     cx.fillStyle='#FFD700';cx.font='bold 36px Arial';cx.textAlign='center';cx.textBaseline='middle';
-    cx.fillText(t('paused'),W/2,H/2-20);
-    cx.fillStyle='#ddd';cx.font='16px Arial';
-    cx.fillText(t('resume'),W/2,H/2+20);
+    cx.fillText(t('paused'),W/2,H/2-40);
+    cx.fillStyle='#ddd';cx.font='14px Arial';
+    cx.fillText(t('resume'),W/2,H/2-10);
+    if(drawBtn(W/2,H/2+35,200,38,t('mainMenu'))){st='menu';window._planeScrollY=0;}
     mC=false;cx.restore();return;
   }
 
